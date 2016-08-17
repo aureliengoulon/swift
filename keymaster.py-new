@@ -1,0 +1,62 @@
+from barbicanclient import orders
+from barbicanclient import client
+from keystoneclient.auth import identity
+from keystoneclient import session
+import base64
+
+cipher = u'AES'
+root_secret_length=256
+mode = u'CBC'
+
+auth = identity.v2.Password(auth_url='http://172.16.21.3:5000/v2.0',
+                            username='admin',
+                            password='password',
+                            tenant_name='demo')
+sess = session.Session(auth=auth)
+barbican = client.Client(session=sess, endpoint='http://172.16.21.3:9311')
+
+class RootSecret(object):
+
+    def __init__(self, algorithm, bit_length, mode, name=None):
+        self.name = u'Swift root secret'
+        self.algorithm = algorithm
+        self.bit_length = bit_length
+        self.mode = mode
+
+def check_root_secret(secret):
+    try:
+        if type(secret) is str:
+            if not base64.decodestring(secret) or not (len(secret)>=32 and len(secret)<=44):
+#            if len(root_secret) != root_secret_length:
+                raise ValueError("Root secret must be length %s bits" % root_secret_length)
+    except TypeError as err:
+        print 'Secret must be encoded in base 64.'
+        print 'Type Error:', err
+    except ValueError as err:
+        print 'Value Error:', err
+
+def create_root_secret(cipher, root_secret_length, mode, name=None):
+    secret = RootSecret(cipher, root_secret_length, mode)
+    try:
+        secret_list = barbican.secrets.list(name=secret.name)
+        if not secret_list:
+            order = barbican.orders.create_key(name=secret.name,
+                                               algorithm=secret.algorithm,
+                                               bit_length=secret.bit_length,
+                                               mode=secret.mode,
+                                               payload_content_type=u'application/octet-stream',
+                                               expiration=None)
+
+            order_ref = order.submit()
+            retrieved_order = barbican.orders.get(order_ref)
+            generated_secret = barbican.secrets.get(retrieved_order.secret_ref)
+            root_secret_b64 = base64.b64encode(generated_secret.payload)
+        else:
+            retrieved_secret = secret_list[0]
+            root_secret_b64 = base64.b64encode(retrieved_secret.payload)
+        check_root_secret(root_secret_b64)
+        return root_secret_b64
+    except NameError as err:
+        print 'NameError:', err
+
+print create_root_secret(cipher, root_secret_length, mode, None)
