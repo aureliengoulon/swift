@@ -34,7 +34,9 @@ def check_root_secret(secret):
             # A base64 secret must breakable in groups of 24-bit groups
             # of input bits  as output strings of 4 encoded charactersts
             # encoded on 6 bits, following recommendations from RFC 4648
-            if not base64.decodestring(secret) or len(secret)/4 != ceil(float(ROOT_SECRET_LENGTH)/24):
+#            if not base64.decodestring(secret) or len(secret)/4 != ceil(float(ROOT_SECRET_LENGTH)/24):
+            if base64.b64encode(base64.b64decode(secret)).strip()!=secret.strip() or \
+              len(secret)/4 != ceil(float(ROOT_SECRET_LENGTH)/24):
                 raise ValueError("Root secret must be length %s bits" % ROOT_SECRET_LENGTH)
     except (TypeError, ValueError):
         raise ValueError(
@@ -47,8 +49,8 @@ def create_root_secret(name=None):
     root_secret_b64=''
     config = ConfigObj('/etc/swift/proxy-server.conf')
     try:
-        secret_list = barbican.secrets.list(ROOT_SECRET_NAME)
-        if not secret_list or config['filter:keymaster']['encryption_root_secret_id']=='':
+#        secret_list = barbican.secrets.list(ROOT_SECRET_NAME)
+        if not barbican.secrets.list(name=ROOT_SECRET_NAME) or config['filter:keymaster']['encryption_root_secret_id']=='':
             order = barbican.orders.create_key(name=ROOT_SECRET_NAME,
                                                algorithm=ROOT_SECRET_CIPHER,
                                                bit_length=ROOT_SECRET_LENGTH,
@@ -65,7 +67,7 @@ def create_root_secret(name=None):
         else:
             #retrieved_secret = secret_list[0]
             retrieved_secret = config['filter:keymaster']['encryption_root_secret_id']
-            root_secret_b64 = base64.b64encode(barbican.secrets.get(retrieved_secret).payload)
+            root_secret_b64 = barbican.secrets.get(retrieved_secret).payload
 #        self.check_root_secret(root_secret_b64)
         check_root_secret(root_secret_b64)
         return root_secret_b64
