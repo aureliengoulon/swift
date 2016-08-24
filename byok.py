@@ -53,6 +53,4 @@ if not uuid_pattern.match(secret_id):
         print 'PayloadException:', err
 
 root_secret_b64 = base64.b64encode(barbican.secrets.get(secret_ref).payload)
-b64_pattern = re.compile(r'^[A-Za-z0-9+/]+[=]{0,2}$')
-if b64_pattern.match(root_secret_b64.strip()):
-    print root_secret_b64
+print root_secret_b64
